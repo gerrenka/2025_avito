@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:15-alpine
+    container_name: review-service-db
+    environment:
+      POSTGRES_DB: reviewdb
+      POSTGRES_USER: reviewuser
+      POSTGRES_PASSWORD: reviewpass
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reviewuser -d reviewdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - review-network
+
+  # Database migrations
+  migrate:
+    image: migrate/migrate
+    container_name: review-service-migrate
+    volumes:
+      - ./migrations:/migrations
+    command: 
+      - "-path=/migrations"
+      - "-database=postgresql://reviewuser:reviewpass@postgres:5432/reviewdb?sslmode=disable"
+      - "up"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - review-network
+    restart: on-failure
+
+  # Application service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: review-service-app
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER_PORT: "8080"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: reviewuser
+      DB_PASSWORD: reviewpass
+      DB_NAME: reviewdb
+      DB_SSLMODE: disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - review-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  review-network:
+    driver: bridge
