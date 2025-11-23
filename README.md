@@ -83,6 +83,7 @@ review-service/
 │   │   ├── user.go
 │   │   ├── pull_request.go
 │   │   ├── router.go
+│   │   ├── health.go
 │   │   ├── helpers.go
 │   │   └── middleware/
 │   │       ├── logger.go
